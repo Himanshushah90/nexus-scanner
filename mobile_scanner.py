@@ -22,12 +22,22 @@ GATE_DEFINITIONS = {
 
 def process_qr(qr_data, gate_id):
     try:
-        # Query attendee
+        # Clean and normalize QR data
+        qr_data = qr_data.strip().upper()
+        if not qr_data.startswith("NEXUS2025-"):
+            qr_data = f"NEXUS2025-{qr_data.replace('NEXUS2025', '')}"
+        
+        # Query attendee with normalized data
         response = supabase.table("attendees").select("*").eq("qr_code_data", qr_data).execute()
         
         if not response.data:
-            return "error", "Invalid QR Code"
+            # Try alternative format (without prefix)
+            alt_qr_data = qr_data.replace("NEXUS2025-", "")
+            response = supabase.table("attendees").select("*").eq("qr_code_data", alt_qr_data).execute()
             
+            if not response.data:
+                return "error", "Invalid QR Code"
+        
         attendee = response.data[0]
         if attendee.get("entry_status"):
             return "warning", f"Already scanned at {attendee['entry_time']}"
@@ -58,9 +68,10 @@ def process_manual_entry(ref_number, gate_id):
         if not ref_number:
             return "warning", "Please enter a reference number"
         
-        # Add prefix if missing
+        # Clean and normalize reference number
+        ref_number = ref_number.strip().upper()
         if not ref_number.startswith("NEXUS2025-"):
-            ref_number = f"NEXUS2025-{ref_number}"
+            ref_number = f"NEXUS2025-{ref_number.replace('NEXUS2025', '')}"
         
         # Process as QR code
         return process_qr(ref_number, gate_id)
